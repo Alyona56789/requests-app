@@ -48,15 +48,18 @@ export default createStore({
       state.requests.push(request)
     },
     UPDATE_REQUEST(state, updatedRequest) {
-      const index = state.requests.findIndex(r => r.id === updatedRequest.id)
-      if (index !== -1) {
-        state.requests.splice(index, 1, updatedRequest)
-      }
-      const unboundIndex = state.unboundRequests.findIndex(r => r.id === updatedRequest.id)
-      if (unboundIndex !== -1) {
-        state.unboundRequests.splice(unboundIndex, 1, updatedRequest)
-      }
-    },
+  const index = state.requests.findIndex(r => r.id === updatedRequest.id)
+  if (index !== -1) {
+    state.requests.splice(index, 1, updatedRequest)
+  }
+  const unboundIndex = state.unboundRequests.findIndex(r => r.id === updatedRequest.id)
+  if (unboundIndex !== -1) {
+    state.unboundRequests.splice(unboundIndex, 1, updatedRequest)
+  }
+  if (state.currentRequest && state.currentRequest.id === updatedRequest.id) {
+    state.currentRequest = updatedRequest
+  }
+   },
     REMOVE_PROJECT(state, projectId) {
       state.projects = state.projects.filter(p => p.id !== projectId)
     },

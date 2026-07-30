@@ -4,6 +4,15 @@
       <v-card-title class="d-flex align-center">
         <h2>Заявка #{{ request?.id }}</h2>
         <v-spacer />
+        <v-btn 
+          v-if="!isEditing"
+          variant="outlined" 
+          color="primary"
+          class="mr-2"
+          @click="startEditing"
+        >
+          Редактировать
+        </v-btn>
         <v-btn variant="outlined" @click="$router.back()">
           ← Назад
         </v-btn>
@@ -14,7 +23,34 @@
       </v-card-text>
 
       <v-card-text v-else-if="request">
-        <v-list>
+        
+        <div v-if="isEditing" class="mb-4">
+          <v-text-field
+            v-model="editForm.title"
+            label="Название"
+            variant="outlined"
+            density="compact"
+            class="mb-2"
+          />
+          <v-textarea
+            v-model="editForm.description"
+            label="Описание"
+            variant="outlined"
+            density="compact"
+            rows="3"
+          />
+          <div class="d-flex gap-2">
+            <v-btn color="primary" :loading="saving" @click="saveChanges">
+              Сохранить
+            </v-btn>
+            <v-btn variant="outlined" @click="cancelEditing">
+              Отмена
+            </v-btn>
+          </div>
+        </div>
+
+        <!-- ИНФОРМАЦИЯ О ЗАЯВКЕ -->
+        <v-list v-else>
           <v-list-item>
             <v-list-item-title>Название</v-list-item-title>
             <v-list-item-subtitle>{{ request.title }}</v-list-item-subtitle>
@@ -46,9 +82,9 @@
 
         <h3 class="mb-4">Изменение статуса</h3>
         
+        <!-- ОСНОВНАЯ ПАНЕЛЬ -->
         <div class="d-flex align-center gap-4 flex-wrap">
           
-          <!-- Кнопка НАЗАД (текстовая) -->
           <v-btn
             v-if="availablePrevStatuses.length === 1"
             color="grey-darken-1"
@@ -59,7 +95,6 @@
             ← {{ availablePrevStatuses[0].name }}
           </v-btn>
 
-          <!-- Текущий статус -->
           <v-chip
             :color="getStatusColor(request.Status?.code)"
             text-color="white"
@@ -69,8 +104,6 @@
             {{ request.Status?.name || 'Неизвестно' }}
           </v-chip>
 
-          <!-- ВПЕРЁД: если 
-          ОДИН вариант - текстовая кнопка -->
           <v-btn
             v-if="availableNextStatuses.length === 1"
             color="primary"
@@ -81,28 +114,27 @@
             {{ availableNextStatuses[0].name }} →
           </v-btn>
 
-        </div>
-
-        <div v-if="availableNextStatuses.length > 1" class="d-flex justify-center gap-8 mt-6">
-          <div 
-            v-for="status in availableNextStatuses" 
-            :key="status.id"
-            class="arrow-down-wrapper"
-            @click="!statusChanging && changeToStatus(status.id)"
-          >
+          <div v-if="availableNextStatuses.length > 1" class="d-flex gap-4">
             <div 
-              class="arrow-down"
-              :style="{ color: getStatusColor(status.code) }"
+              v-for="status in availableNextStatuses" 
+              :key="status.id"
+              class="arrow-wrapper"
+              @click="!statusChanging && changeToStatus(status.id)"
             >
-              ↓
-            </div>
-            <div class="arrow-label">
-              {{ status.name }}
+              <div 
+                class="arrow-symbol"
+                :style="{ color: getStatusColor(status.code) }"
+              >
+                ➜
+              </div>
+              <div class="arrow-label">
+                {{ status.name }}
+              </div>
             </div>
           </div>
+
         </div>
 
-        <!-- Сообщение если нет переходов -->
         <v-alert 
           v-if="availableNextStatuses.length === 0 && availablePrevStatuses.length === 0" 
           type="info" 
@@ -124,7 +156,7 @@
 </template>
 
 <script>
-import { mapGetters } from 'vuex'
+import { mapGetters, mapActions } from 'vuex'
 import axios from 'axios'
 
 export default {
@@ -133,9 +165,15 @@ export default {
     return {
       loading: true,
       statusChanging: false,
+      saving: false,
       error: null,
       availableNextStatuses: [],
-      availablePrevStatuses: []
+      availablePrevStatuses: [],
+      isEditing: false,
+      editForm: {
+        title: '',
+        description: ''
+      }
     }
   },
   computed: {
@@ -148,6 +186,8 @@ export default {
     await this.loadRequest()
   },
   methods: {
+    ...mapActions(['updateRequest']),
+
     async loadRequest() {
       this.loading = true
       this.error = null
@@ -169,13 +209,47 @@ export default {
         const requestId = this.$route.params.id
         const response = await axios.get(`http://localhost:3000/request/${requestId}/status/transitions/`)
         
-        console.log('Доступные переходы:', response.data)
-        
         this.availableNextStatuses = response.data.next || []
         this.availablePrevStatuses = response.data.prev || []
       } catch (err) {
         console.error('Ошибка загрузки переходов:', err)
         this.error = 'Не удалось загрузить доступные статусы'
+      }
+    },
+
+    startEditing() {
+      this.editForm.title = this.request.title || ''
+      this.editForm.description = this.request.description || ''
+      this.isEditing = true
+    },
+
+    cancelEditing() {
+      this.isEditing = false
+    },
+
+    async saveChanges() {
+      if (!this.editForm.title.trim()) {
+        this.error = 'Название не может быть пустым'
+        return
+      }
+
+      this.saving = true
+      this.error = null
+
+      try {
+        const requestId = this.$route.params.id
+        await this.updateRequest({
+          id: requestId,
+          data: {
+            title: this.editForm.title.trim(),
+            description: this.editForm.description.trim()
+          }
+        })
+        this.isEditing = false
+      } catch (err) {
+        this.error = 'Ошибка сохранения: ' + (err.response?.data?.error || err.message)
+      } finally {
+        this.saving = false
       }
     },
 
@@ -214,47 +288,47 @@ export default {
 </script>
 
 <style scoped>
+.gap-2 {
+  gap: 8px;
+}
 .gap-4 {
   gap: 16px;
-}
-.gap-8 {
-  gap: 64px;
 }
 .flex-wrap {
   flex-wrap: wrap;
 }
 
-.arrow-down-wrapper {
+.arrow-wrapper {
   display: flex;
   flex-direction: column;
   align-items: center;
   cursor: pointer;
-  padding: 16px;
-  border-radius: 12px;
+  padding: 8px;
+  border-radius: 8px;
   transition: all 0.2s ease;
   user-select: none;
 }
 
-.arrow-down-wrapper:hover {
+.arrow-wrapper:hover {
   background-color: rgba(0, 0, 0, 0.05);
-  transform: translateY(4px);
+  transform: translateY(-2px);
 }
 
-.arrow-down {
-  font-size: 72px;
+.arrow-symbol {
+  font-size: 48px;
   font-weight: bold;
   line-height: 1;
   transition: transform 0.2s ease;
 }
 
-.arrow-down-wrapper:hover .arrow-down {
-  transform: translateY(8px);
+.arrow-wrapper:hover .arrow-symbol {
+  transform: translateX(6px);
 }
 
 .arrow-label {
-  margin-top: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 500;
   text-align: center;
   color: #333;
 }
