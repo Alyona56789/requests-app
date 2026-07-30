@@ -45,14 +45,21 @@ export default createStore({
       if (index !== -1) {
         state.requests[index] = updatedRequest
       }
-    }
+    },
+    REMOVE_REQUEST_FROM_PROJECT(state, requestId) {
+      state.requests = state.requests.filter(r => r.id !== requestId)
+    },
   },
   actions: {
-    // Проекты
     async fetchProjects({ commit }) {
       const response = await api.get('/projects/')
       commit('SET_PROJECTS', response.data)
     },
+    async fetchProject({ commit }, projectId) {
+      const response = await api.get(`/project/${projectId}/`)
+      commit('SET_CURRENT_PROJECT', response.data)
+      return response.data
+},
     async createProject({ commit }, projectData) {
       const response = await api.post('/project/', projectData)
       commit('ADD_PROJECT', response.data)
@@ -87,10 +94,11 @@ export default createStore({
       commit('UPDATE_REQUEST', response.data)
       return response.data
     },
-    async unbindRequest({ commit }, requestId) {
-      const response = await api.post(`/request/${requestId}/unbind/`)
-      commit('UPDATE_REQUEST', response.data)
+    async unbindRequest({ commit, dispatch }, { requestId, projectId }) {
+      const response = await api.post(`/request/${requestId}/unbind/${projectId}/`)
+      await dispatch('fetchProject', projectId)
+      await dispatch('fetchUnboundRequests')
       return response.data
-    }
+},
   }
 })
