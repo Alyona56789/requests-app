@@ -4,20 +4,34 @@
       ← Назад к проектам
     </v-btn>
 
-    <h1 class="text-h4 mb-4">
-      Проект: {{ project?.name || 'Загрузка...' }}
-    </h1>
+    <div class="d-flex align-center mb-4">
+      <h1 class="text-h4">
+        Проект: {{ project?.name || 'Загрузка...' }}
+      </h1>
+      <v-spacer />
+      <v-btn color="secondary" prepend-icon="mdi-file-plus" @click="showRequestForm = true">
+        Добавить заявку в проект
+      </v-btn>
+    </div>
 
-    <!-- Заявки проекта -->
+    <v-expand-transition>
+      <RequestForm
+        v-if="showRequestForm"
+        :request="null"
+        @submit="handleRequestSubmit"
+        @cancel="showRequestForm = false"
+      />
+    </v-expand-transition>
+
     <v-card class="mb-6">
       <v-card-title>Заявки проекта</v-card-title>
       <v-table>
         <thead>
           <tr>
-            <th class="text-left" style="width: 50px">ID</th>
-            <th class="text-left">Название</th>
-            <th class="text-left" style="width: 150px">Статус</th>
-            <th class="text-left" style="width: 150px">Действия</th>
+            <th style="width: 50px">ID</th>
+            <th>Название</th>
+            <th style="width: 150px">Статус</th>
+            <th style="width: 150px">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -35,8 +49,8 @@
             <td>{{ req.id }}</td>
             <td>{{ req.title }}</td>
             <td>
-              <v-chip 
-                size="small" 
+              <v-chip
+                size="small"
                 :color="getStatusColor(req.Status?.code)"
                 text-color="white"
               >
@@ -58,16 +72,15 @@
       </v-table>
     </v-card>
 
-    <!-- Непривязанные заявки -->
     <v-card>
       <v-card-title>Непривязанные заявки</v-card-title>
       <v-table>
         <thead>
           <tr>
-            <th class="text-left" style="width: 50px">ID</th>
-            <th class="text-left">Название</th>
-            <th class="text-left" style="width: 150px">Статус</th>
-            <th class="text-left" style="width: 180px">Действия</th>
+            <th style="width: 50px">ID</th>
+            <th>Название</th>
+            <th style="width: 150px">Статус</th>
+            <th style="width: 180px">Действия</th>
           </tr>
         </thead>
         <tbody>
@@ -85,8 +98,8 @@
             <td>{{ req.id }}</td>
             <td>{{ req.title }}</td>
             <td>
-              <v-chip 
-                size="small" 
+              <v-chip
+                size="small"
                 :color="getStatusColor(req.Status?.code)"
                 text-color="white"
               >
@@ -112,14 +125,17 @@
 
 <script>
 import { mapActions } from 'vuex'
+import RequestForm from '../components/RequestForm.vue'
 
 export default {
   name: 'ProjectDetailView',
+  components: { RequestForm },
   data() {
     return {
       project: null,
       projectRequests: [],
-      unboundRequests: []
+      unboundRequests: [],
+      showRequestForm: false
     }
   },
   async created() {
@@ -128,40 +144,76 @@ export default {
     await this.loadUnboundRequests()
   },
   methods: {
-    ...mapActions(['fetchProject', 'fetchUnboundRequests', 'bindRequest', 'unbindRequest']),
-    
+    ...mapActions({
+      fetchProjectAction: 'fetchProject',
+      fetchUnboundRequestsAction: 'fetchUnboundRequests',
+      bindRequestAction: 'bindRequest',
+      unbindRequestAction: 'unbindRequest',
+      createRequestAction: 'createRequest'
+    }),
+
     getStatusColor(code) {
       const colors = {
-        'draft': 'grey',
-        'in_progress': 'blue',
-        'review': 'orange',
-        'accepted': 'green',
-        'rejected': 'red'
+        draft: 'grey',
+        in_progress: 'blue',
+        review: 'orange',
+        accepted: 'green',
+        rejected: 'red'
       }
       return colors[code] || 'grey'
     },
-    
+
     async loadProject(id) {
-      const project = await this.fetchProject(id)
-      this.project = project
-      this.projectRequests = project.Requests || []
+      try {
+        const project = await this.fetchProjectAction(id)
+        this.project = project
+        this.projectRequests = project.Requests || []
+      } catch (err) {
+        console.error('Ошибка загрузки проекта:', err)
+      }
     },
-    
+
     async loadUnboundRequests() {
-      await this.fetchUnboundRequests()
-      this.unboundRequests = this.$store.state.requests
+      try {
+        await this.fetchUnboundRequestsAction()
+        this.unboundRequests = this.$store.state.unboundRequests
+      } catch (err) {
+        console.error('Ошибка загрузки непривязанных заявок:', err)
+      }
     },
-    
+
+    async handleRequestSubmit(data) {
+      try {
+        const projectId = this.$route.params.id
+        await this.createRequestAction({ ...data, projectId: Number(projectId) })
+        this.showRequestForm = false
+        await this.loadProject(projectId)
+        await this.loadUnboundRequests()
+      } catch (err) {
+        console.error('Ошибка создания заявки:', err)
+      }
+    },
+
     async unbindRequest(requestId) {
-      await this.unbindRequest({ requestId, projectId: this.project.id })
-      await this.loadProject(this.project.id)
-      await this.loadUnboundRequests()
+      try {
+        const projectId = this.$route.params.id
+        await this.unbindRequestAction({ requestId, projectId })
+        await this.loadProject(projectId)
+        await this.loadUnboundRequests()
+      } catch (err) {
+        console.error('Ошибка отвязки:', err)
+      }
     },
-    
+
     async bindRequest(requestId) {
-      await this.bindRequest({ requestId, projectId: this.project.id })
-      await this.loadProject(this.project.id)
-      await this.loadUnboundRequests()
+      try {
+        const projectId = this.$route.params.id
+        await this.bindRequestAction({ requestId, projectId })
+        await this.loadProject(projectId)
+        await this.loadUnboundRequests()
+      } catch (err) {
+        console.error('Ошибка привязки:', err)
+      }
     }
   }
 }

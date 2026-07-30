@@ -1,4 +1,4 @@
-const { Project, Request } = require('../models');
+const { Project, Request, Status } = require('../models');
 
 exports.createProject = async (req, res) => {
   try {
@@ -15,7 +15,10 @@ exports.createProject = async (req, res) => {
 exports.getAllProjects = async (req, res) => {
   try {
     const projects = await Project.findAll({
-      include: [{ model: Request, attributes: ['id', 'title'] }] 
+      include: [{
+        model: Request,
+        include: [{ model: Status }]
+      }]
     });
     res.json(projects);
   } catch (error) {
@@ -27,8 +30,12 @@ exports.getProjectById = async (req, res) => {
   try {
     const { id } = req.params;
     const project = await Project.findByPk(id, {
-      include: [Request] 
+      include: [{
+        model: Request,
+        include: [{ model: Status }]
+      }]
     });
+
     if (!project) return res.status(404).json({ error: 'Проект не найден' });
     res.json(project);
   } catch (error) {
@@ -40,7 +47,7 @@ exports.updateProject = async (req, res) => {
   try {
     const { id } = req.params;
     const { name } = req.body;
-    
+
     const project = await Project.findByPk(id);
     if (!project) return res.status(404).json({ error: 'Проект не найден' });
 
