@@ -2,12 +2,14 @@ const express = require('express');
 const cors = require('cors');
 const sequelize = require('./config/db');
 const { Status, Project, Request } = require('./models'); 
+const projectRoutes = require('./routes/projectRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(projectRoutes);
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Сервер заявок запущен' });
