@@ -10,15 +10,19 @@ const Status = sequelize.define('Status', {
   code: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true 
+    unique: true
   },
   name: {
     type: DataTypes.STRING,
-    allowNull: false 
+    allowNull: false
+  },
+  transitions: {
+    type: DataTypes.JSON,
+    defaultValue: { next: [], prev: [] }
   }
 }, {
   tableName: 'statuses',
-  timestamps: false 
+  timestamps: false
 });
 
 module.exports = Status;

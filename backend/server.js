@@ -27,16 +27,26 @@ const start = async () => {
     await sequelize.sync({ alter: true }); 
     console.log('Таблицы синхронизированы');
 
-    const statuses = await Status.findAll();
+        const statuses = await Status.findAll();
     if (statuses.length === 0) {
-      await Status.bulkCreate([
+      const created = await Status.bulkCreate([
         { code: 'draft', name: 'Заготовка' },
         { code: 'in_progress', name: 'В работе' },
         { code: 'review', name: 'На согласовании' },
         { code: 'accepted', name: 'Принята' },
         { code: 'rejected', name: 'Отказ' }
       ]);
-      console.log('Начальные статусы созданы');
+
+      const map = {};
+      created.forEach(s => map[s.code] = s.id);
+
+      await Status.update({ transitions: { next: [map.in_progress], prev: [] } }, { where: { code: 'draft' } });
+      await Status.update({ transitions: { next: [map.review], prev: [map.draft] } }, { where: { code: 'in_progress' } });
+      await Status.update({ transitions: { next: [map.accepted, map.rejected], prev: [map.in_progress] } }, { where: { code: 'review' } });
+      await Status.update({ transitions: { next: [], prev: [map.review] } }, { where: { code: 'accepted' } });
+      await Status.update({ transitions: { next: [], prev: [map.review] } }, { where: { code: 'rejected' } });
+
+      console.log('Начальные статусы и граф переходов созданы');
     }
 
     app.listen(PORT, () => console.log(`Сервер работает на http://localhost:${PORT}`));

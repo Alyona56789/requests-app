@@ -70,3 +70,68 @@ exports.deleteRequest = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+exports.bindRequest = async (req, res) => {
+  try {
+    const { requestId, projectId } = req.params;
+    const project = await Project.findByPk(projectId);
+    if (!project) return res.status(404).json({ error: 'Проект не найден' });
+
+    const request = await Request.findByPk(requestId);
+    if (!request) return res.status(404).json({ error: 'Заявка не найдена' });
+
+    await request.update({ projectId });
+    res.json(request);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.unbindRequest = async (req, res) => {
+  try {
+    const { requestId } = req.params; 
+    const request = await Request.findByPk(requestId);
+    if (!request) return res.status(404).json({ error: 'Заявка не найдена' });
+
+    await request.update({ projectId: null });
+    res.json(request);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.nextStatus = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const request = await Request.findByPk(requestId, { include: [Status] });
+    if (!request) return res.status(404).json({ error: 'Заявка не найдена' });
+
+    const nextIds = request.Status.transitions?.next || [];
+    if (nextIds.length === 0) return res.status(400).json({ error: 'Нет доступных следующих статусов' });
+
+    const nextStatus = await Status.findByPk(nextIds[0]);
+    await request.update({ statusId: nextStatus.id });
+
+    res.json({ message: 'Статус обновлён', request: await Request.findByPk(requestId, { include: [Status] }) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
+exports.prevStatus = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const request = await Request.findByPk(requestId, { include: [Status] });
+    if (!request) return res.status(404).json({ error: 'Заявка не найдена' });
+
+    const prevIds = request.Status.transitions?.prev || [];
+    if (prevIds.length === 0) return res.status(400).json({ error: 'Нет доступных предыдущих статусов' });
+
+    const prevStatus = await Status.findByPk(prevIds[0]);
+    await request.update({ statusId: prevStatus.id });
+
+    res.json({ message: 'Статус обновлён', request: await Request.findByPk(requestId, { include: [Status] }) });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
