@@ -9,7 +9,11 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+
 app.use(projectRoutes);
+
+const requestRoutes = require('./routes/requestRoutes');
+app.use(requestRoutes);
 
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'Сервер заявок запущен' });
